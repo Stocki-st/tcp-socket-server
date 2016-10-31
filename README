@@ -1,0 +1,24 @@
+README
+
+~HELP~
+To use this client you have to add the IP and the Port as parameter.
+For example:
+ ./client -i 127.0.0.1 -p 7777
+
+All options:
+# -i ... IP address
+# -p ... Port
+# -h ... Help
+
+If you do not set any IP or port, default values (ipconf.h) will be used.
+
+Special commands:
+ ~logout~ ... client will disconnect and terminate.
+ ~shutdown~ ... server will shutdown
+
+GIT:
+
+
+Astyle:
+astyle ./*.c ./*.h
+

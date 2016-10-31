@@ -1,12 +1,12 @@
-/* 
+/*
  * @filename:    ipconf.h
  * @author:      Stefan Stockinger
- * @date:        2016-10-31 
+ * @date:        2016-10-31
  * @description: this file contains global network settings
 */
 
 
-#ifndef IPCONF_H 
+#ifndef IPCONF_H
 #define IPCONF_H
 
 #define MAXLINE 4096 //max text line length
