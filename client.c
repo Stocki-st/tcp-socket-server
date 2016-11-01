@@ -74,6 +74,11 @@ int main(int argc, char **argv)
             perror("The server terminated prematurely");
             exit(4);
         }
+        if(strncmp(recvline,"~do-logout~",11) == 0) {
+            printf("client logged out successfully! Tschüssi!\n");
+            close(sockfd);
+            exit(0);
+        }
         printf("\nString received from the server: %s\n", recvline);
     }
     exit(0);

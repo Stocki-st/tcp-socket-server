@@ -15,7 +15,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <time.h>
-
+#include <wait.h>
+#include <signal.h>
 
 #include <semaphore.h>
 #include <pthread.h>
@@ -47,8 +48,7 @@ int main (int argc, char **argv)
 
 //Create a socket for the soclet
 //If sockfd<0 there was an error in the creation of the socket
-    if ((listenfd = socket (AF_INET, SOCK_STREAM, 0)) <0)
-    {
+    if ((listenfd = socket (AF_INET, SOCK_STREAM, 0)) <0) {
         perror("Problem in creating the socket");
         exit(2);
     }
@@ -65,53 +65,63 @@ int main (int argc, char **argv)
     listen (listenfd, LISTENQ);
     printf("%s\n","Server running...waiting for connections.");
 
-    for ( ; ; )
-    {
+    for( ; ; ) {
         clilen = sizeof(cliaddr);
         //accept a connection
         connfd = accept (listenfd, (struct sockaddr *) &cliaddr, &clilen);
-        printf("%s\n","Received request...");
+	    if(connfd == -1)
+	        perror("Connecion not acceped");
+        else
+           printf("%s\n","Received request...");
+
         childpid = fork ();
         if (childpid < 0) {
             perror("fork()");
         } else if (childpid == 0) { //if it’s 0, it’s child process
             printf ("%s\n","Child created for dealing with client requests");
-///TODO: send message to parent with log data
-            //close listening socket
-            close (listenfd);
-            memset(buf, '\0',n+1);
+            ///TODO: send message to parent with log data
+
+
             while ( (n = recv(connfd, buf, MAXLINE,0)) > 0)
             {
                 printf("\nString received from and resent to the client: %s\n",buf);
-                if(strncmp(buf,"~logout~",8) == 0)
-                    printf("client logged out");
-//TODO: kill PID of logged Task and send terminate command back
-                else if(strncmp(buf,"~shutdown~",10) == 0)
+                if(strncmp(buf,"~logout~",8) == 0) {
+                    sprintf(buf,"~do-logout~\n");
+                    send(connfd, buf, strlen(buf), 0);
+                    
+                    printf("Client logged out, Child proccess will termiate -> PID: %d\n",getpid());
+                    fflush(stdout);
+                    close(connfd);
+                    close (listenfd);
+                    exit(0);
+                } else if(strncmp(buf,"~shutdown~",10) == 0) {
                     printf("shutdown forced");
-                fflush(stdout);
-//TODO: send terminate command to all clients and kill all pids
-                send(connfd, buf, n, 0);
-            }
-            if (n < 0)
-                printf("%s\n", "Read error");
-            exit(0);
-        } else
-        {   //parent
-///TODO: logfile
 
+                    sprintf(buf,"~do-logout~\n");
+                    send(connfd, buf, strlen(buf), 0);
+                    close(connfd);
+                    printf("Server will shutdown. Clients will be forced to terminate.\n");
+                    exit(0);
+                } else {
+                    send(connfd, buf, n, 0);
+                }
+                
+            }
+        } else {  //parent
+            //TODO: logfile
+printf("jetz wieder im parent");
             logfile = open("./log/serverlog", O_WRONLY | O_CREAT, S_IRWXU | S_IRGRP);
             if(logfile == -1)
                 perror("unable to open logfile");
-            else
-            {
+            else {
                 char logmsg[] = "testasdiasdi";
                 sprintf(logbuf,"%s: %s",get_timestamp(), logmsg);
                 if(write(logfile,logbuf,strlen(logbuf)) == -1)
                     perror("unable to write to logfile");
+		//close socket of the server
+  	        close(connfd);
             }
         }
-//close socket of the server
-        close(connfd);
     }
 }
 
