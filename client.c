@@ -18,7 +18,7 @@
 
 int main(int argc, char **argv)
 {
-    int sockfd;
+    int sockfd, n;
     extern char *optarg;
     struct sockaddr_in servaddr;
     char sendline[MAXLINE], recvline[MAXLINE];
@@ -26,10 +26,8 @@ int main(int argc, char **argv)
     const char helpmsg[] = {"~HELP~\nTo use this client you have to add the IP and the Port as parameter.\nFor example:\n\n ./client -i 127.0.0.1 -p 7777\n\nAll options:\n# -i ... IP address\n# -p ... Port \n# -h ... Help\n\nIf you do not set any IP or port, default values (ipconf.h) will be used.\nSpecial command:\n ~logout~ ... client will disconnect and terminate.\n ~shutdown~ ... server will shutdown\n\nExit"};
 
 //check command line parameters
-    while((c = getopt(argc, argv, "i:p:h")) != -1)
-    {
-        switch(c)
-        {
+    while((c = getopt(argc, argv, "i:p:h")) != -1) {
+        switch(c) {
         case 'i':
             ip_address = strdup(optarg);
             break;
@@ -44,8 +42,7 @@ int main(int argc, char **argv)
 
 //Create a socket for the client
 //If sockfd<0 there was an error in the creation of the socket
-    if ((sockfd = socket (AF_INET, SOCK_STREAM, 0)) <0)
-    {
+    if ((sockfd = socket (AF_INET, SOCK_STREAM, 0)) <0) {
         perror("Problem in creating the socket");
         exit(2);
     }
@@ -57,29 +54,29 @@ int main(int argc, char **argv)
     servaddr.sin_port =  htons(port_number); //convert to big-endian order
 
 //Connection of the client to the socket
-    if (connect(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr))<0)
-    {
+    if (connect(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr))<0) {
         perror("Unable to connect. Please check IP and Port settings.");
         exit(3);
     }
     printf("Succesfully connected to %s on port %d\n", ip_address, port_number);
 
-
-    while (fgets(sendline, MAXLINE, stdin) != NULL)
-    {
+    while (fgets(sendline, MAXLINE-1, stdin) != NULL) {
         send(sockfd, sendline, strlen(sendline), 0);
-        if (recv(sockfd, recvline, MAXLINE,0) == 0)
-        {
+        n = recv(sockfd, recvline, MAXLINE-1,0);
+        if (n == 0) {
             //error: server terminated prematurely
             perror("The server terminated prematurely");
             exit(4);
+        } else {
+            recvline[n]='\0';
+            if(strncmp(recvline,"~do-logout~",11) == 0) {
+                printf("client logged out successfully! Tschüssi!\n");
+                close(sockfd);
+                exit(0);
+            }
+            printf("%s %s","String received from the server: ", recvline);
+            printf("Type in your message > ");
         }
-        if(strncmp(recvline,"~do-logout~",11) == 0) {
-            printf("client logged out successfully! Tschüssi!\n");
-            close(sockfd);
-            exit(0);
-        }
-        printf("\nString received from the server: %s\n", recvline);
     }
     exit(0);
 }

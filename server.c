@@ -17,6 +17,7 @@
 #include <time.h>
 #include <wait.h>
 #include <signal.h>
+#include <sys/msg.h>
 
 #include <semaphore.h>
 #include <pthread.h>
@@ -24,27 +25,48 @@
 
 #include "ipconf.h"
 
-char* get_timestamp(void);
-void *logger_management(void *ptr);
 
-sem_t mutex;
+/*
+#define MQLOGKEY 0x77777777
+#define MQTYPE 1
+
+struct msg {
+  long type;
+  char msg[20];
+};
+
+*/
+
+
+
+char* get_timestamp(void);
+void *logger_thread_func(void *ptr);
+void *server_thread_func(void *ptr);
+//sem_t mutex;
 
 
 int main (int argc, char **argv)
 {
-    int listenfd, logfile, connfd, n = 0;
+    int listenfd, connfd, n = 0;
     pid_t childpid;
     socklen_t clilen;
     char buf[MAXLINE];
     struct sockaddr_in cliaddr, servaddr;
     char logbuf[64];
+    /*
+    struct msg data;
+    data.type = MQTYPE;
+    long int msqid = msgget(MQKEY, IPC_CREAT | S_IRWXU | S_IROTH);s
+    */
 
+    /*
+        pthread_t logger_thread, server_thread;
 
-    //pthread_t logger_thread;
-
-//Create Logger Thread
-    //pthread_create(&logger_thread,NULL,logger_management, "Logger Thread");
-    //pthread_join(logger_thread, NULL);
+    //Create Logger Thread
+        pthread_create(&logger_thread,NULL,&logger_thread_func, NULL);
+        pthread_create(&server_thread,NULL,&server_thread_func, NULL);
+        pthread_join(logger_thread, NULL);
+        pthread_join(server_thread, NULL);*/
 
 //Create a socket for the soclet
 //If sockfd<0 there was an error in the creation of the socket
@@ -69,10 +91,10 @@ int main (int argc, char **argv)
         clilen = sizeof(cliaddr);
         //accept a connection
         connfd = accept (listenfd, (struct sockaddr *) &cliaddr, &clilen);
-	    if(connfd == -1)
-	        perror("Connecion not acceped");
+        if(connfd == -1)
+            perror("Connecion not acceped");
         else
-           printf("%s\n","Received request...");
+            printf("%s\n","Received request...");
 
         childpid = fork ();
         if (childpid < 0) {
@@ -81,46 +103,37 @@ int main (int argc, char **argv)
             printf ("%s\n","Child created for dealing with client requests");
             ///TODO: send message to parent with log data
 
-
-            while ( (n = recv(connfd, buf, MAXLINE,0)) > 0)
+            while ((n = recv(connfd, buf, MAXLINE-1,0)) > 0)
             {
-                printf("\nString received from and resent to the client: %s\n",buf);
+
+                buf[n] = '\0';
+                printf("%s %s\n","String received from and resent to the client:", buf);
+                fflush(stdout);
+
                 if(strncmp(buf,"~logout~",8) == 0) {
                     sprintf(buf,"~do-logout~\n");
                     send(connfd, buf, strlen(buf), 0);
-                    
-                    printf("Client logged out, Child proccess will termiate -> PID: %d\n",getpid());
+                    printf("Client logged out, Child proccess will terminate -> PID: %d\n",getpid());
                     fflush(stdout);
                     close(connfd);
                     close (listenfd);
                     exit(0);
                 } else if(strncmp(buf,"~shutdown~",10) == 0) {
-                    printf("shutdown forced");
-
+                    printf("ATTENTION: shutdown forced\n");
                     sprintf(buf,"~do-logout~\n");
                     send(connfd, buf, strlen(buf), 0);
                     close(connfd);
                     printf("Server will shutdown. Clients will be forced to terminate.\n");
                     exit(0);
                 } else {
+
                     send(connfd, buf, n, 0);
                 }
-                
             }
         } else {  //parent
             //TODO: logfile
-printf("jetz wieder im parent");
-            logfile = open("./log/serverlog", O_WRONLY | O_CREAT, S_IRWXU | S_IRGRP);
-            if(logfile == -1)
-                perror("unable to open logfile");
-            else {
-                char logmsg[] = "testasdiasdi";
-                sprintf(logbuf,"%s: %s",get_timestamp(), logmsg);
-                if(write(logfile,logbuf,strlen(logbuf)) == -1)
-                    perror("unable to write to logfile");
-		//close socket of the server
-  	        close(connfd);
-            }
+            //close socket of the server
+            close(connfd);
         }
     }
 }
@@ -132,7 +145,25 @@ char* get_timestamp(void)
     return asctime(localtime(&now));
 }
 
-void *logger_management(void *ptr)
+void *logger_thread_func(void *ptr)
 {
+    int logfile;
+    char logbuf[] = "pt";
+    logfile = open("./log/serverlog", O_WRONLY | O_CREAT, S_IRWXU | S_IRGRP);
+    if(logfile == -1)
+        perror("unable to open logfile");
+    else {
+        char logmsg[] = "testasdiasdi";
+        sprintf(logbuf,"%s: %s",get_timestamp(), logmsg);
+        if(write(logfile,logbuf,strlen(logbuf)) == -1)
+            perror("unable to write to logfile");
+    }
     printf("logger_management called");
+    return 0;
 }
+
+void *server_thread_func(void *ptr)
+{
+    return 0;
+}
+

@@ -9,7 +9,7 @@ all :   main.c crc32.c
 	gcc -Wall --pedantic main.c crc32.c
 
 server: server.c
-	gcc -Wall --pedantic server.c -o server
+	gcc -Wall --pedantic server.c -o server -lpthread 
 
 Client: client.c
 	gcc -Wall --pedantic client.c -o client
