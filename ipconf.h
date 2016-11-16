@@ -10,7 +10,7 @@
 #define IPCONF_H
 
 #define MAXLINE 4096 //max text line length
-#define LISTENQ 20 
+#define LISTENQ 20
 char* ip_address = "127.0.0.1";
 uint16_t port_number = 7777;
 

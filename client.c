@@ -91,29 +91,29 @@ int main(int argc, char **argv)
     printf("Succesfully connected to %s on port %d\n", ip_address, port_number);
     if(inputfile>0) {
 //TODO: read line by line
-       // while (fgets(sendline, MAXLINE-1, inputfile) != NULL) {
+        // while (fgets(sendline, MAXLINE-1, inputfile) != NULL) {
         while ((n = read(inputfile, sendline, MAXLINE-1)) > 0) {
-        //while (getline(sendline, MAXLINE-1, inputfile) != -1) {
-        //while ((pread(inputfile, sendline, MAXLINE-1, 0)) != EOF) {
+            //while (getline(sendline, MAXLINE-1, inputfile) != -1) {
+            //while ((pread(inputfile, sendline, MAXLINE-1, 0)) != EOF) {
 
 
-        sendline[n]='\0';
-        printf("read line > %s\n", sendline);
-        send(sockfd, sendline, strlen(sendline), 0);
-        n = recv(sockfd, recvline, MAXLINE-1,0);
-        if (n == 0) {
-            //error: server terminated prematurely
-            perror("The server terminated prematurely");
-            exit(4);
-        } else {
-            recvline[n]='\0';
-            if(strncmp(recvline,"~do-logout~",11) == 0) {
-                printf("client logged out successfully! Tschüssi!\n");
-                close(sockfd);
-                exit(0);
+            sendline[n]='\0';
+            printf("read line > %s\n", sendline);
+            send(sockfd, sendline, strlen(sendline), 0);
+            n = recv(sockfd, recvline, MAXLINE-1,0);
+            if (n == 0) {
+                //error: server terminated prematurely
+                perror("The server terminated prematurely");
+                exit(4);
+            } else {
+                recvline[n]='\0';
+                if(strncmp(recvline,"~do-logout~",11) == 0) {
+                    printf("client logged out successfully! Tschüssi!\n");
+                    close(sockfd);
+                    exit(0);
+                }
+                printf("%s %s\n","String received from the server: ", recvline);
             }
-            printf("%s %s\n","String received from the server: ", recvline);
-              }
         }
     } else {
         printf("Type in your message > ");
