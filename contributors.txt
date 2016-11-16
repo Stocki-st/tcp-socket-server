@@ -10,7 +10,7 @@ To do:
 6) check listen() return value in server.c
 10) fix get_timestamp() linking in client.c
 11) send error to client and block connection
-12)
+12) adapt return values as written in the specs
 13)
 14)
 15)

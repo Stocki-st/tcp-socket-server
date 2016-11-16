@@ -89,51 +89,28 @@ int main(int argc, char **argv)
         exit(3);
     }
     printf("Succesfully connected to %s on port %d\n", ip_address, port_number);
-    if(inputfile>0) {
-//TODO: read line by line
-        // while (fgets(sendline, MAXLINE-1, inputfile) != NULL) {
-        while ((n = read(inputfile, sendline, MAXLINE-1)) > 0) {
-            //while (getline(sendline, MAXLINE-1, inputfile) != -1) {
-            //while ((pread(inputfile, sendline, MAXLINE-1, 0)) != EOF) {
+    if(inputfile>0)
+        dup2(inputfile, STDIN_FILENO);
 
-
-            sendline[n]='\0';
-            printf("read line > %s\n", sendline);
-            send(sockfd, sendline, strlen(sendline), 0);
-            n = recv(sockfd, recvline, MAXLINE-1,0);
-            if (n == 0) {
-                //error: server terminated prematurely
-                perror("The server terminated prematurely");
-                exit(4);
-            } else {
-                recvline[n]='\0';
-                if(strncmp(recvline,"~do-logout~",11) == 0) {
-                    printf("client logged out successfully! Tschüssi!\n");
-                    close(sockfd);
-                    exit(0);
-                }
-                printf("%s %s\n","String received from the server: ", recvline);
+    printf("Your message > ");
+    while (fgets(sendline, MAXLINE-1, stdin) != NULL) {
+        if(inputfile>0)
+            printf("%s\n", sendline);
+        send(sockfd, sendline, strlen(sendline), 0);
+        n = recv(sockfd, recvline, MAXLINE-1,0);
+        if (n == 0) {
+            //error: server terminated prematurely
+            perror("The server terminated prematurely");
+            exit(4);
+        } else {
+            recvline[n]='\0';
+            if(strncmp(recvline,"~do-logout~",11) == 0) {
+                printf("client logged out successfully! Tschüssi!\n");
+                close(sockfd);
+                exit(0);
             }
-        }
-    } else {
-        printf("Type in your message > ");
-        while (fgets(sendline, MAXLINE-1, stdin) != NULL) {
-            send(sockfd, sendline, strlen(sendline), 0);
-            n = recv(sockfd, recvline, MAXLINE-1,0);
-            if (n == 0) {
-                //error: server terminated prematurely
-                perror("The server terminated prematurely");
-                exit(4);
-            } else {
-                recvline[n]='\0';
-                if(strncmp(recvline,"~do-logout~",11) == 0) {
-                    printf("client logged out successfully! Tschüssi!\n");
-                    close(sockfd);
-                    exit(0);
-                }
-                printf("%s %s\n","String received from the server: ", recvline);
-                printf("Type in your message > ");
-            }
+            printf("%s %s\n","String received from the server: ", recvline);
+            printf("Your message > ");
         }
     }
     exit(0);
