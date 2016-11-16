@@ -13,20 +13,29 @@
 #include <netinet/in.h>
 #include <string.h>
 #include <arpa/inet.h>
+#include <fcntl.h>
 
 #include "ipconf.h"
+#include "timestamp.h"
+
+#define MAXFILENAME 20 //maximum length of filename
 
 int main(int argc, char **argv)
 {
-    int sockfd, n;
+    int sockfd, n, logfile, inputfile = 0;
     extern char *optarg;
     struct sockaddr_in servaddr;
     char sendline[MAXLINE], recvline[MAXLINE];
+    char filename[MAXFILENAME];
+    char logname[MAXFILENAME];
+    char logbuf[MAXLINE+20];
     char c;
-    const char helpmsg[] = {"~HELP~\nTo use this client you have to add the IP and the Port as parameter.\nFor example:\n\n ./client -i 127.0.0.1 -p 7777\n\nAll options:\n# -i ... IP address\n# -p ... Port \n# -h ... Help\n\nIf you do not set any IP or port, default values (ipconf.h) will be used.\nSpecial command:\n ~logout~ ... client will disconnect and terminate.\n ~shutdown~ ... server will shutdown\n\nExit"};
+
+
+    const char helpmsg[] = {"~HELP~\nTo use this client you have to add the IP and the Port as parameter.\nFor example:\n\n ./client -i 127.0.0.1 -p 7777 -f ./Client_read/read1\n\nThe Client will connect to IP 127.0.0.1 on port 7777 and uses the file 'read1' in the folder 'Client_read' as source.\n\nAll options:\n# -i ... IP address\n# -p ... Port \n# -h ... Help\n# -f ... read from file\n\nIf you do not set any IP or port, default values (ipconf.h) will be used.\nSpecial command:\n ~logout~ ... client will disconnect and terminate.\n ~shutdown~ ... server will shutdown\n\nExit"};
 
 //check command line parameters
-    while((c = getopt(argc, argv, "i:p:h")) != -1) {
+    while((c = getopt(argc, argv, "i:p:f:h")) != -1) {
         switch(c) {
         case 'i':
             ip_address = strdup(optarg);
@@ -34,10 +43,27 @@ int main(int argc, char **argv)
         case 'p':
             port_number = atoi(optarg);
             break;
+        case 'f':
+            snprintf(filename, MAXFILENAME,"%s",optarg);
+            inputfile = open(filename, O_RDONLY , S_IRWXU | S_IRGRP);
+            if(inputfile == -1) {
+                perror("input file not found\n");
+                exit(0);
+            }
+            printf("opened: '%s'\n", filename);
+            break;
         case 'h':
             perror(helpmsg);
             exit(0);
         }
+    }
+
+
+//open/create logfile
+    sprintf(logname, "./log/clientlog_%d\n",getpid());
+    logfile = open(logname, O_WRONLY | O_APPEND | O_CREAT, S_IRWXU | S_IRGRP);
+    if(logfile == -1) {
+        perror("unable to open logfile");
     }
 
 //Create a socket for the client
@@ -45,8 +71,12 @@ int main(int argc, char **argv)
     if ((sockfd = socket (AF_INET, SOCK_STREAM, 0)) <0) {
         perror("Problem in creating the socket");
         exit(2);
+    } else {
+        //sprintf(logbuf,"%s: %s\n", get_timestamp(),"Start of Client Logfile");
+        sprintf(logbuf,"%s: %s\n", "42","Start of Client Logfile");
+        if(write(logfile,logbuf,strlen(logbuf)) == -1)
+            perror("unable to write to logfile");
     }
-
 //Creation of the socket
     memset(&servaddr, 0, sizeof(servaddr));
     servaddr.sin_family = AF_INET;
@@ -59,8 +89,16 @@ int main(int argc, char **argv)
         exit(3);
     }
     printf("Succesfully connected to %s on port %d\n", ip_address, port_number);
+    if(inputfile>0) {
+//TODO: read line by line
+       // while (fgets(sendline, MAXLINE-1, inputfile) != NULL) {
+        while ((n = read(inputfile, sendline, MAXLINE-1)) > 0) {
+        //while (getline(sendline, MAXLINE-1, inputfile) != -1) {
+        //while ((pread(inputfile, sendline, MAXLINE-1, 0)) != EOF) {
 
-    while (fgets(sendline, MAXLINE-1, stdin) != NULL) {
+
+        sendline[n]='\0';
+        printf("read line > %s\n", sendline);
         send(sockfd, sendline, strlen(sendline), 0);
         n = recv(sockfd, recvline, MAXLINE-1,0);
         if (n == 0) {
@@ -74,9 +112,40 @@ int main(int argc, char **argv)
                 close(sockfd);
                 exit(0);
             }
-            printf("%s %s","String received from the server: ", recvline);
-            printf("Type in your message > ");
+            printf("%s %s\n","String received from the server: ", recvline);
+              }
+        }
+    } else {
+        printf("Type in your message > ");
+        while (fgets(sendline, MAXLINE-1, stdin) != NULL) {
+            send(sockfd, sendline, strlen(sendline), 0);
+            n = recv(sockfd, recvline, MAXLINE-1,0);
+            if (n == 0) {
+                //error: server terminated prematurely
+                perror("The server terminated prematurely");
+                exit(4);
+            } else {
+                recvline[n]='\0';
+                if(strncmp(recvline,"~do-logout~",11) == 0) {
+                    printf("client logged out successfully! Tschüssi!\n");
+                    close(sockfd);
+                    exit(0);
+                }
+                printf("%s %s\n","String received from the server: ", recvline);
+                printf("Type in your message > ");
+            }
         }
     }
     exit(0);
 }
+
+/*
+logfile = open("./log/clientlog", O_WRONLY | O_CREAT, S_IRWXU | S_IRGRP);
+    if(logfile == -1)
+        perror("unable to open logfile");
+    else {
+        char logmsg[] = "testasdiasdi";
+        sprintf(logbuf,"%s: %s",get_timestamp(), logmsg);
+        if(write(logfile,logbuf,strlen(logbuf)) == -1)
+            perror("unable to write to logfile");
+    }*/

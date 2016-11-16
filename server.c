@@ -14,7 +14,6 @@
 #include <netinet/in.h>
 #include <string.h>
 #include <unistd.h>
-#include <time.h>
 #include <wait.h>
 #include <signal.h>
 #include <sys/msg.h>
@@ -24,7 +23,8 @@
 
 
 #include "ipconf.h"
-
+#include "crc32.h"
+#include "timestamp.h"
 
 /*
 #define MQLOGKEY 0x77777777
@@ -38,8 +38,6 @@ struct msg {
 */
 
 
-
-char* get_timestamp(void);
 void *logger_thread_func(void *ptr);
 void *server_thread_func(void *ptr);
 //sem_t mutex;
@@ -47,7 +45,7 @@ void *server_thread_func(void *ptr);
 
 int main (int argc, char **argv)
 {
-    int listenfd, connfd, n = 0;
+    int listenfd, connfd, n, connections = 0;
     pid_t childpid;
     socklen_t clilen;
     char buf[MAXLINE];
@@ -96,60 +94,64 @@ int main (int argc, char **argv)
         else
             printf("%s\n","Received request...");
 
-        childpid = fork ();
-        if (childpid < 0) {
-            perror("fork()");
-        } else if (childpid == 0) { //if it’s 0, it’s child process
-            printf ("%s\n","Child created for dealing with client requests");
-            ///TODO: send message to parent with log data
+        connections++;
+        if(connections > LISTENQ) {
+///TODO: send error to client and block connection
+            //  printf ("%s\n","connection blocked - reached maximum number of connections");
+            //  connections--;
+        } else {
+            childpid = fork ();
+            if (childpid < 0) {
+                perror("fork()");
+            } else if (childpid == 0) { //if it’s 0, it’s child process
+                printf ("%s\n","Child created for dealing with client requests");
+                ///TODO: send message to parent with log data
 
-            while ((n = recv(connfd, buf, MAXLINE-1,0)) > 0)
-            {
+                while ((n = recv(connfd, buf, MAXLINE-1,0)) > 0)
+                {
 
-                buf[n] = '\0';
-                printf("%s %s\n","String received from and resent to the client:", buf);
-                fflush(stdout);
-
-                if(strncmp(buf,"~logout~",8) == 0) {
-                    sprintf(buf,"~do-logout~\n");
-                    send(connfd, buf, strlen(buf), 0);
-                    printf("Client logged out, Child proccess will terminate -> PID: %d\n",getpid());
+                    buf[n] = '\0';
+                    printf("%s %s\n","String received from and resent to the client:", buf);
                     fflush(stdout);
-                    close(connfd);
-                    close (listenfd);
-                    exit(0);
-                } else if(strncmp(buf,"~shutdown~",10) == 0) {
-                    printf("ATTENTION: shutdown forced\n");
-                    sprintf(buf,"~do-logout~\n");
-                    send(connfd, buf, strlen(buf), 0);
-                    close(connfd);
-                    printf("Server will shutdown. Clients will be forced to terminate.\n");
-                    exit(0);
-                } else {
 
-                    send(connfd, buf, n, 0);
+                    if(strncmp(buf,"~logout~",8) == 0) {
+                        sprintf(buf,"~do-logout~\n");
+                        send(connfd, buf, strlen(buf), 0);
+                        printf("Client logged out, Child proccess will terminate -> PID: %d\n",getpid());
+                        fflush(stdout);
+                        close(connfd);
+                        close (listenfd);
+                        connections--;
+                        exit(0);
+                    } else if(strncmp(buf,"~shutdown~",10) == 0) {
+                        printf("ATTENTION: shutdown forced\n");
+                        sprintf(buf,"~do-logout~\n");
+                        send(connfd, buf, strlen(buf), 0);
+                        close(connfd);
+                        printf("Server will shutdown. Clients will be forced to terminate.\n");
+                        exit(0);
+                    } else {
+                        uint32_t crc = crc32(buf, strlen(buf));
+                        sprintf(buf,"%u\n",crc);
+                        send(connfd, buf, strlen(buf), 0);
+                    }
                 }
+            } else {  //parent
+                //TODO: logfile
+                //close socket of the server
+                close(connfd);
             }
-        } else {  //parent
-            //TODO: logfile
-            //close socket of the server
-            close(connfd);
         }
     }
 }
 
 
-char* get_timestamp(void)
-{
-    time_t now = time(NULL);
-    return asctime(localtime(&now));
-}
 
 void *logger_thread_func(void *ptr)
 {
     int logfile;
     char logbuf[] = "pt";
-    logfile = open("./log/serverlog", O_WRONLY | O_CREAT, S_IRWXU | S_IRGRP);
+    logfile = open("./log/serverlog", O_WRONLY | O_APPEND | O_CREAT, S_IRWXU | S_IRGRP);
     if(logfile == -1)
         perror("unable to open logfile");
     else {

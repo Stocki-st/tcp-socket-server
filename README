@@ -9,6 +9,7 @@ All options:
 # -i ... IP address
 # -p ... Port
 # -h ... Help
+# -f ... read from file
 
 If you do not set any IP or port, default values (ipconf.h) will be used.
 

@@ -1,1 +1,44 @@
 Stefan Stockinger
+
+To do:
+
+1) Thread for log - Server
+2) Thread for log - Client
+3) Server Shutdown on Server
+4) Server Shutdown on Client
+5) Client file read
+6) check listen() return value in server.c
+10) fix get_timestamp() linking in client.c
+11) send error to client and block connection
+12)
+13)
+14)
+15)
+16)
+17)
+18)
+19)
+20)
+
+
+Done:
+16.11.2016
+7) add hash function 
+8) only unsigned hash value
+9) outstanding module for timestamp
+
+
+Questions:
+- Returning ASCII strings only (optional, +3 points): das mach ich ja eh mit sprintf...oder?
+
+
+
+
+extras:
+Proper shutdown (optional, +3 points)
+Returning ASCII strings only (optional, +3 points)
+Reading input from a file (optional, +3 points)
+
+?
+Support for IPv6 and hostnames (optional, +5 points)
+Daemonization of the server (optional, +3 points)
