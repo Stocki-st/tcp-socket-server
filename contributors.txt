@@ -3,30 +3,46 @@ Stefan Stockinger
 To do:
 
 1) Thread for log - Server
-2) Thread for log - Client
-3) Server Shutdown on Server
-4) Server Shutdown on Client
-5) Client file read
+3) Server Shutdown on Server (<- server should send do-logout command to all connected clients)
 6) check listen() return value in server.c
 10) fix get_timestamp() linking in client.c
-11) send error to client and block connection
+11) maximum connections reache:send error to client and block connection
 12) adapt return values as written in the specs
-13)
-14)
-15)
-16)
-17)
-18)
-19)
-20)
+13) client schickt hash code an server, server "entschlüsselt" den hash und sendet einen string zurück, der auf den gleichen
+14) add client hash calc function
+15) check #define _POSIX_C_SOURCE     200112L warning
+16) IPv6 support
+18) implement hash cracker in server
+19) hostname support http://www.binarytides.com/hostname-to-ip-address-c-sockets-linux/
+20) provide meaningful exit codes
+22) "strg + c" in server
+23) 
+24)
+25)
+26)
+27)
+28)
+29)
+39)
+31)
+32)
+33)
+
 
 
 Done:
+
+21.11.2016
+2) logfile - Client
+17) catch cntrl_c signal
+21) client logout with strg+c
+
 16.11.2016
+5) Client file read
 7) add hash function 
 8) only unsigned hash value
 9) outstanding module for timestamp
-
+4) Server Shutdown on Client 
 
 Questions:
 - Returning ASCII strings only (optional, +3 points): das mach ich ja eh mit sprintf...oder?
@@ -42,3 +58,5 @@ Reading input from a file (optional, +3 points)
 ?
 Support for IPv6 and hostnames (optional, +5 points)
 Daemonization of the server (optional, +3 points)
+
+

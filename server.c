@@ -26,6 +26,9 @@
 #include "crc32.h"
 #include "timestamp.h"
 
+
+#define _POSIX_C_SOURCE     200112L
+
 /*
 #define MQLOGKEY 0x77777777
 #define MQTYPE 1
@@ -37,12 +40,16 @@ struct msg {
 
 */
 
+void cntrl_c_handler(int ignored);
 
 void *logger_thread_func(void *ptr);
 void *server_thread_func(void *ptr);
 //sem_t mutex;
 
 
+/** @brief server main function
+ *
+ */
 int main (int argc, char **argv)
 {
     int listenfd, connfd, n, connections = 0;
@@ -51,6 +58,10 @@ int main (int argc, char **argv)
     char buf[MAXLINE];
     struct sockaddr_in cliaddr, servaddr;
     char logbuf[64];
+
+// catch cntrl_c signal
+    signal(SIGINT, cntrl_c_handler);
+
     /*
     struct msg data;
     data.type = MQTYPE;
@@ -67,7 +78,7 @@ int main (int argc, char **argv)
         pthread_join(server_thread, NULL);*/
 
 //Create a socket for the soclet
-//If sockfd<0 there was an error in the creation of the socket
+//If listenfd<0 there was an error in the creation of the socket
     if ((listenfd = socket (AF_INET, SOCK_STREAM, 0)) <0) {
         perror("Problem in creating the socket");
         exit(2);
@@ -169,3 +180,12 @@ void *server_thread_func(void *ptr)
     return 0;
 }
 
+
+/** @brief catches control + c signal
+ *
+ */
+void cntrl_c_handler(int ignored) {
+
+    printf("\nexit with strg c \n");
+
+}
