@@ -17,12 +17,4 @@ Special commands:
  ~logout~ ... client will disconnect and terminate.
  ~shutdown~ ... server will shutdown
 
-GIT:
-git push origin matser
-git add "filename"
-git commit -a
-git push
-
-Astyle:
-astyle ./*.c ./*.h
 

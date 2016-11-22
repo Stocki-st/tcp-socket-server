@@ -1,21 +1,27 @@
 Stefan Stockinger
 
+GIT:
+git push origin matser
+git add "filename"
+git commit -a
+git push
+
+Astyle:
+astyle ./*.c ./*.h
+
+
 To do:
 
 1) Thread for log - Server
 3) Server Shutdown on Server (<- server should send do-logout command to all connected clients)
 6) check listen() return value in server.c
-10) fix get_timestamp() linking in client.c
-11) maximum connections reache:send error to client and block connection
+10) fix get_timestamp() linking in client.cg
+11) maximum connections reached:send error to client and block connection
 12) adapt return values as written in the specs
-13) client schickt hash code an server, server "entschlüsselt" den hash und sendet einen string zurück, der auf den gleichen
 14) add client hash calc function
 15) check #define _POSIX_C_SOURCE     200112L warning
 16) IPv6 support
-18) implement hash cracker in server
-19) hostname support http://www.binarytides.com/hostname-to-ip-address-c-sockets-linux/
 20) provide meaningful exit codes
-22) "strg + c" in server
 23) 
 24)
 25)
@@ -31,6 +37,11 @@ To do:
 
 
 Done:
+22.11.2016
+22) "strg + c" in server
+18) implement hash cracker in server
+13) client schickt hash code an server, server "entschlüsselt" den hash und sendet einen string zurück, der auf den gleichen
+19) hostname support
 
 21.11.2016
 2) logfile - Client
@@ -45,18 +56,22 @@ Done:
 4) Server Shutdown on Client 
 
 Questions:
-- Returning ASCII strings only (optional, +3 points): das mach ich ja eh mit sprintf...oder?
+
 
 
 
 
 extras:
+
+
+?
+
+Daemonization of the server (optional, +3 points)
+
+
+done:
 Proper shutdown (optional, +3 points)
 Returning ASCII strings only (optional, +3 points)
 Reading input from a file (optional, +3 points)
-
-?
 Support for IPv6 and hostnames (optional, +5 points)
-Daemonization of the server (optional, +3 points)
-
 

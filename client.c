@@ -13,6 +13,7 @@
 #include <netinet/in.h>
 #include <string.h>
 #include <arpa/inet.h>
+#include<netdb.h>
 #include <fcntl.h>
 #include <time.h>
 #include <signal.h>
@@ -29,6 +30,7 @@ char* get_timestamp(void);
 void print_help(void);
 void write_logfile(int fd, char* msg);
 void cntrl_c_handler(int ignored);
+int hostname_to_ip(char *hostname , char *ip);
 
 volatile sig_atomic_t quit = 0;
 
@@ -66,7 +68,16 @@ int main(int argc, char **argv)
     while((c = getopt(argc, argv, "i:p:f:h")) != -1) {
         switch(c) {
         case 'i':
-            ip_address = strdup(optarg);
+            if(inet_pton(AF_INET, optarg, &servaddr.sin_addr)) {
+                //IPv4
+                ip_address = strdup(optarg);
+            }else if(inet_pton(AF_INET6 , optarg, &servaddr.sin_addr)) {
+		//IPv6
+                servaddr.sin_family = AF_INET6;
+            } else {
+                //hostname
+                hostname_to_ip(strdup(optarg), ip_address);
+            }
             break;
 
         case 'p':
@@ -77,7 +88,7 @@ int main(int argc, char **argv)
             inputfile = open(filename, O_RDONLY , S_IRWXU | S_IRGRP);
             if(inputfile == -1) {
                 perror("input file not found\n");
-                exit(0);
+                exit(EXIT_FAILURE);
             }
             sprintf(logmsg,"opened: '%s' as input\n", filename);
             printf("%s", logmsg);
@@ -98,7 +109,7 @@ int main(int argc, char **argv)
         sprintf(logmsg, "Problem in creating the socket\n");
         perror(logmsg);
         write_logfile(logfile,logmsg);
-        exit(2);
+        exit(EXIT_FAILURE);
     }
 //Creation of the socket
     servaddr.sin_family = AF_INET;
@@ -110,7 +121,7 @@ int main(int argc, char **argv)
         sprintf(logmsg, "Unable to connect. Please check IP and Port settings.");
         perror(logmsg);
         write_logfile(logfile,logmsg);
-        exit(3);
+        exit(EXIT_FAILURE);
     }
     sprintf(logmsg,"Succesfully connected to %s on port %d\n", ip_address, port_number);
     printf("%s", logmsg);
@@ -138,7 +149,7 @@ int main(int argc, char **argv)
                 sprintf(logmsg,"Hash of %s is '%u'\n", sendline, crc);
                 write_logfile(logfile, logmsg);
                 sprintf(sendline,"%u\n",crc);
-                printf("calculated hash: %s\n", sendline);
+                printf("calculated hash: %s\n . . . Please wait for server . . . \n", sendline);
             }
         }
         send(sockfd, sendline, strlen(sendline), 0);
@@ -147,14 +158,14 @@ int main(int argc, char **argv)
             sprintf(logmsg,"The server terminated prematurely");
             perror(logmsg);
             write_logfile(logfile, logmsg);
-            exit(4);
+            exit(EXIT_FAILURE);
         } else {
             recvline[n]='\0';
             if(strncmp(recvline,"~do-logout~",11) == 0) {
                 sprintf(logmsg,"client logged out successfully! Tschüssi!\n");
                 printf("%s",logmsg);
                 write_logfile(logfile, logmsg);
-                close(sockfd);  
+                close(sockfd);
                 close(logfile);
                 if(inputfile>0)
                     close(inputfile);
@@ -172,7 +183,7 @@ int main(int argc, char **argv)
 /** @brief writes messages to the logfile
  *
  */
-void write_logfile(int fd, char* msg) 
+void write_logfile(int fd, char* msg)
 {
     char logbuf[MAXLINE+20];
     sprintf(logbuf,"%s: %s\n",get_timestamp(), msg);
@@ -183,7 +194,7 @@ void write_logfile(int fd, char* msg)
 /** @brief catches the control + c signal
  *
  */
-void cntrl_c_handler(int ignored) 
+void cntrl_c_handler(int ignored)
 {
     quit = 1;
     printf("\n\n\n ##############################\n Press any key to leave the app\n ##############################\n");
@@ -192,16 +203,48 @@ void cntrl_c_handler(int ignored)
 /** @brief generates a timestamp
  *
  */
-char* get_timestamp(void) 
+char* get_timestamp(void)
 {
     time_t now = time(NULL);
     return asctime(localtime(&now));
 }
 
+
+/** @brief get ip from domain name
+ *   source: https://cis.technikum-wien.at/documents/mes/1/sec/semesterplan/em2/vo-03-sockets.handout.pdf
+ */
+int hostname_to_ip(char *hostname , char *ip)
+{
+    struct addrinfo * servinfo ;
+    int ret = getaddrinfo (hostname, NULL , NULL , &servinfo );
+    if ( ret != 0) {
+        fprintf ( stderr , " getaddrinfo :%s\n", gai_strerror ( ret ));
+        exit (1);
+    }
+
+// loop through all the results and connect to the first we can
+    struct addrinfo *p;
+    for (p = servinfo; p != NULL; p = p->ai_next) {
+        //char ipstr [8*4 + 7 + 1];
+
+        if (p->ai_family == AF_INET) {
+            struct sockaddr_in *s = (struct sockaddr_in *)p->ai_addr;
+            inet_ntop(AF_INET, &s->sin_addr, ip, sizeof(ip));
+        } else { // AF_INET6
+            struct sockaddr_in6 *s = (struct sockaddr_in6 *)p->ai_addr ;
+            inet_ntop(AF_INET6, &s->sin6_addr, ip, sizeof(ip));
+        }
+    }
+    freeaddrinfo(servinfo);
+printf("ip: %s \n", ip);
+}
+
+
+
 /** @brief prints the help message to stdout
  *
  */
-void print_help(void) 
+void print_help(void)
 {
     const char helpmsg[] = {"~HELP~\nTo use this client you have to add the IP and the Port as parameter.\nFor example:\n\n ./client -i 127.0.0.1 -p 7777 -f ./Client_read/read1\n\nThe Client will connect to IP 127.0.0.1 on port 7777 and uses the file 'read1' in the folder 'Client_read' as source.\n\nAll options:\n# -i ... IP address\n# -p ... Port \n# -h ... Help\n# -f ... read from file\n\nIf you do not set any IP or port, default values (ipconf.h) will be used.\nSpecial command:\n ~logout~ ... client will disconnect and terminate.\n ~shutdown~ ... server will shutdown\n\nExit"};
     printf("%s\n", helpmsg);

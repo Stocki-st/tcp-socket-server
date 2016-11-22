@@ -26,6 +26,7 @@
 #include "crc32.h"
 #include "timestamp.h"
 
+#define DEBUG 1
 
 #define _POSIX_C_SOURCE     200112L
 
@@ -41,10 +42,15 @@ struct msg {
 */
 
 void cntrl_c_handler(int ignored);
+void hash_cracker(uint32_t orig_crc, char conflict[5]);
 
 void *logger_thread_func(void *ptr);
 void *server_thread_func(void *ptr);
 //sem_t mutex;
+
+
+
+volatile sig_atomic_t quit = 0;
 
 
 /** @brief server main function
@@ -81,11 +87,11 @@ int main (int argc, char **argv)
 //If listenfd<0 there was an error in the creation of the socket
     if ((listenfd = socket (AF_INET, SOCK_STREAM, 0)) <0) {
         perror("Problem in creating the socket");
-        exit(2);
+        exit(EXIT_FAILURE);
     }
 
 //preparation of the socket address
-    servaddr.sin_family = AF_INET;
+    servaddr.sin_family = AF_UNSPEC;
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     servaddr.sin_port = htons(port_number);
 
@@ -117,24 +123,22 @@ int main (int argc, char **argv)
             } else if (childpid == 0) { //if it’s 0, it’s child process
                 printf ("%s\n","Child created for dealing with client requests");
                 ///TODO: send message to parent with log data
-
+                uint32_t crc = 0;
+                char new_hash[5];
                 while ((n = recv(connfd, buf, MAXLINE-1,0)) > 0)
                 {
 
                     buf[n] = '\0';
-                    printf("%s %s\n","String received from and resent to the client:", buf);
-                    fflush(stdout);
-
+                    printf("String received from and resent to the client: %s", buf);
                     if(strncmp(buf,"~logout~",8) == 0) {
                         sprintf(buf,"~do-logout~\n");
                         send(connfd, buf, strlen(buf), 0);
                         printf("Client logged out, Child proccess will terminate -> PID: %d\n",getpid());
-                        fflush(stdout);
                         close(connfd);
                         close (listenfd);
                         connections--;
                         exit(0);
-                    } else if(strncmp(buf,"~shutdown~",10) == 0) {
+                    } else if((strncmp(buf,"~shutdown~",10) == 0) ||(quit ==1) ) {
                         printf("ATTENTION: shutdown forced\n");
                         sprintf(buf,"~do-logout~\n");
                         send(connfd, buf, strlen(buf), 0);
@@ -142,8 +146,18 @@ int main (int argc, char **argv)
                         printf("Server will shutdown. Clients will be forced to terminate.\n");
                         exit(0);
                     } else {
-                        uint32_t crc = crc32(buf, strlen(buf));
-                        sprintf(buf,"%u\n",crc);
+                        crc = crc32(buf, strlen(buf));
+#ifdef DEBUG
+                        new_hash[0] = 'T';
+                        new_hash[1] = 'E';
+                        new_hash[2] = 'S';
+                        new_hash[3] = 'T';
+                        new_hash[4] = '\0';
+#else
+                        hash_cracker(crc, new_hash);
+#endif
+                        printf("conflict hash = '%s'\n\n", new_hash);
+                        sprintf(buf,"conflict hash = '%s'\n",new_hash);
                         send(connfd, buf, strlen(buf), 0);
                     }
                 }
@@ -151,12 +165,11 @@ int main (int argc, char **argv)
                 //TODO: logfile
                 //close socket of the server
                 close(connfd);
+
             }
         }
     }
 }
-
-
 
 void *logger_thread_func(void *ptr)
 {
@@ -187,5 +200,33 @@ void *server_thread_func(void *ptr)
 void cntrl_c_handler(int ignored) {
 
     printf("\nexit with strg c \n");
+    quit = 1;
+    exit(0);
+}
 
+
+/** @brief calculates a hash conflict
+ *
+ */
+void hash_cracker(uint32_t orig_crc,  char conflict[5])
+{
+    //char result[1024];
+    uint32_t cur_crc;
+    uint32_t i = 0;
+
+    /* search for equal hash code */
+    while (1) {
+        uint8_t in[] = {(i>>24), (i>>16), (i>>8), i};
+        cur_crc = crc32(in, sizeof(in));
+
+        if (cur_crc == orig_crc) {
+            conflict[0] = in[0];
+            conflict[1] = in[1];
+            conflict[2] = in[2];
+            conflict[3] = in[3];
+            conflict[4] = '\0';
+            break;
+        }
+        i++;
+    }
 }
