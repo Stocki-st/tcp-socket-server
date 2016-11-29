@@ -16,7 +16,7 @@
 
 #include "timestamp.h"
 
-#define MAXLINE 4096 
+#define MAXLINE 4096
 
 void log_message(char *filename, char* msg)
 {

@@ -10,7 +10,7 @@
 
 
 /** @brief generates a timestamp
- *  
+ *
  */
 char* get_timestamp(void)
 {

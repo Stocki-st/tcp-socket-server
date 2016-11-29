@@ -21,7 +21,8 @@
 #include "logfile.h"
 #include "crc32.h"
 
-
+#define _GNU_SOURCE
+#define _POSIX_C_SOURCE     200112L
 #define MAXFILENAME 25 //maximum length of filename
 
 void print_help(void);
@@ -68,14 +69,16 @@ int main(int argc, char **argv)
                 servaddr.sin_family = AF_INET6;
             } else {
                 //hostname
-                if(hostname_to_ip(strdup(optarg), ip_address)){
-                    
+                if(hostname_to_ip(strdup(optarg), ip_address)) {
                     sprintf(logmsg,"unable to resolve hostname - please check your input!");
                     perror(logmsg);
-                    log_message(logname, logmsg);                
-                    exit(0);                
+                    log_message(logname, logmsg);
+                    exit(EXIT_FAILURE);
                 }
             }
+                    sprintf(logmsg,"resolve '%s' to ip: '%s'", strdup(optarg), ip_address);
+                    perror(logmsg);
+                    log_message(logname, logmsg);
             break;
 
         case 'p':
@@ -94,7 +97,7 @@ int main(int argc, char **argv)
             break;
         case 'h':
             print_help();
-            exit(0);
+            exit(EXIT_SUCCESS);
         }
     }
 
@@ -164,7 +167,7 @@ int main(int argc, char **argv)
                 close(sockfd);
                 if(inputfile>0)
                     close(inputfile);
-                exit(0);
+                exit(EXIT_SUCCESS);
             }
             sprintf(logmsg,"String received from the server: %s", recvline);
             log_message(logname, logmsg);
@@ -172,7 +175,7 @@ int main(int argc, char **argv)
             printf("Your message > ");
         }
     }
-    exit(0);
+    exit(EXIT_SUCCESS);
 }
 
 
@@ -185,7 +188,7 @@ int main(int argc, char **argv)
 void cntrl_c_handler(int ignored)
 {
     quit = 1;
-    printf("\n\n\n ##############################\n Press any key to leave the app\n ##############################\n");
+    printf("\n\n\n ###############################\n Press 'RETURN' to leave the app\n ###############################\n");
 }
 
 
@@ -205,7 +208,7 @@ int hostname_to_ip(char *hostname , char *ip)
     struct addrinfo *p;
     //char ipstr [8*4 + 7 + 1];
     for (p = servinfo; p != NULL; p = p->ai_next) {
-      if (p->ai_family == AF_INET) {
+        if (p->ai_family == AF_INET) {
             struct sockaddr_in *s = (struct sockaddr_in *)p->ai_addr;
             inet_ntop(AF_INET, &s->sin_addr, ip, sizeof(ip));
         } else { // AF_INET6

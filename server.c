@@ -17,7 +17,6 @@
 #include <wait.h>
 #include <signal.h>
 #include <sys/msg.h>
-
 #include <semaphore.h>
 #include <pthread.h>
 
@@ -26,14 +25,22 @@
 #include "crc32.h"
 #include "logfile.h"
 
-#define DEBUG 1
+#define DEBUG 0
 
 #define _POSIX_C_SOURCE     200112L
 
 
 void cntrl_c_handler(int ignored);
-void hash_cracker(uint32_t orig_crc, char conflict[5]);
+void hash_cracker(uint32_t orig_crc, uint8_t conflict[5]);
 void log_message(char *filename, char* msg);
+
+void *hashi_cracker(void *ptr);
+
+typedef struct thread_job_s {
+  char data[1024];
+  int len;
+  int socket_fd;
+} thread_job_t;
 
 
 volatile sig_atomic_t quit = 0;
@@ -50,6 +57,9 @@ int main (int argc, char **argv)
     char buf[MAXLINE];
     struct sockaddr_in cliaddr, servaddr;
     char logbuf[MAXLINE];
+
+  pthread_t thread;
+  thread_job_t thread_data;
 
 // catch cntrl_c signal
     signal(SIGINT, cntrl_c_handler);
@@ -70,7 +80,11 @@ int main (int argc, char **argv)
     bind (listenfd, (struct sockaddr *) &servaddr, sizeof(servaddr));
 
 //listen to the socket by creating a connection queue, then wait for clients
-    listen (listenfd, LISTENQ);
+    if (listen(listenfd, LISTENQ) < 0) {
+        perror("listen");
+        exit(EXIT_FAILURE);
+    }
+
     printf("%s\n","Server running...waiting for connections.");
     log_message("./log/serverlog","Server started - waiting for connections\n");
     for( ; ; ) {
@@ -95,9 +109,9 @@ int main (int argc, char **argv)
             } else if (childpid == 0) { //if it’s 0, it’s child process
                 printf ("%s\n","Child created for dealing with client requests");
                 log_message("./log/serverlog","Child created for dealing with client requests\n");
-
+pthread_create(&thread, NULL, hashi_cracker, (void *)&thread_data);
                 uint32_t crc = 0;
-                char new_hash[5];
+                uint8_t new_hash[5];
                 while ((n = recv(connfd, buf, MAXLINE-1,0)) > 0)
                 {
                     buf[n-1] = '\0';
@@ -125,15 +139,14 @@ int main (int argc, char **argv)
                         exit(0);
                     } else {
                         crc = crc32(buf, strlen(buf));
-#ifdef DEBUG
+
                         new_hash[0] = 'T';
                         new_hash[1] = 'E';
                         new_hash[2] = 'S';
                         new_hash[3] = 'T';
                         new_hash[4] = '\0';
-#else
+
                         hash_cracker(crc, new_hash);
-#endif
                         sprintf(logbuf,"conflict hash  of '%s' is '%s'\n",buf, new_hash);
                         log_message("./log/serverlog",logbuf);
                         printf("%s",logbuf);
@@ -163,7 +176,7 @@ void cntrl_c_handler(int ignored) {
 /** @brief calculates a hash conflict
  *
  */
-void hash_cracker(uint32_t orig_crc,  char conflict[5])
+void hash_cracker(uint32_t orig_crc,  uint8_t conflict[5])
 {
     //char result[1024];
     uint32_t cur_crc;
@@ -184,7 +197,43 @@ void hash_cracker(uint32_t orig_crc,  char conflict[5])
         }
         i++;
     }
+    printf("%d %d %d %d\n", conflict[0], conflict[1], conflict[2], conflict[3]);
+    printf("%c %c %c %c\n", conflict[0], conflict[1], conflict[2], conflict[3]);
 }
 
 
+void *hashi_cracker(void *ptr)
+{
+/*
+  thread_job_t *job = (thread_job_t *)ptr;
+  uint32_t orig_crc = crc32(job->data, job->len);
+  char result[1024];
+  uint32_t cur_crc;
+  uint32_t i = 0;
 
+  // search for equal hash code 
+ while (1) {
+    uint8_t in[] = {(i>>24), (i>>16), (i>>8), i};
+    cur_crc = crc32(in, sizeof(in));
+
+    if (cur_crc == orig_crc) {
+      break;
+    }
+    i++;
+  }
+
+  // format result in string 
+  sprintf(result, "0x%08"PRIx32"\r\n", i);
+
+  // send result to client 
+  if(send(job->socket_fd, result, strlen(result),
+          0) != strlen(result) ) {
+    perror("send");
+  }
+
+  */
+
+
+printf("IM AN A THREAD!!!\n");
+return NULL;
+}
