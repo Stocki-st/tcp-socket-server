@@ -22,7 +22,7 @@
 #include "crc32.h"
 
 #define _GNU_SOURCE
-#define _POSIX_C_SOURCE     200112L
+
 #define MAXFILENAME 25 //maximum length of filename
 
 void print_help(void);
@@ -76,9 +76,9 @@ int main(int argc, char **argv)
                     exit(EXIT_FAILURE);
                 }
             }
-                    sprintf(logmsg,"resolve '%s' to ip: '%s'", strdup(optarg), ip_address);
-                    perror(logmsg);
-                    log_message(logname, logmsg);
+            sprintf(logmsg,"resolve '%s' to ip: '%s'", strdup(optarg), ip_address);
+            perror(logmsg);
+            log_message(logname, logmsg);
             break;
 
         case 'p':
@@ -142,7 +142,7 @@ int main(int argc, char **argv)
             quit = 0;
         } else {
             //check for special commands (must not be hashed)
-            if(!(strncmp(sendline,"~logout~",8) == 0) || (strncmp(sendline,"~shutdown~",10) == 0)) {
+            if(!((strncmp(sendline,"~logout~",8) == 0) || (strncmp(sendline,"~shutdown~",10) == 0))) {
                 crc = crc32(sendline, strlen(sendline));
                 sendline[strlen(sendline)-1] = '\0';
                 sprintf(logmsg,"Hash of '%s' is '%u'\n", sendline, crc);
@@ -169,7 +169,7 @@ int main(int argc, char **argv)
                     close(inputfile);
                 exit(EXIT_SUCCESS);
             }
-            sprintf(logmsg,"String received from the server: %s", recvline);
+            sprintf(logmsg,"String received from the server: %s\n", recvline);
             log_message(logname, logmsg);
             printf("%s",logmsg);
             printf("Your message > ");

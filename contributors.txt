@@ -16,7 +16,6 @@ To do:
 15) check #define _POSIX_C_SOURCE     200112L warning
 16) IPv6 support
 20) provide meaningful exit codes
-25)
 26)
 27)
 28)
@@ -28,9 +27,12 @@ To do:
 
 Changelog:
 
-28.11.2016
+30.11.2016
+25) created log thread for server
 
+28.11.2016
 6) check listen() return value in server.c
+
 23.11.2016
 1) log for server
 14) add client hash calc function

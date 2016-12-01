@@ -25,26 +25,22 @@
 #include "crc32.h"
 #include "logfile.h"
 
-#define DEBUG 0
-
-#define _POSIX_C_SOURCE     200112L
-
 
 void cntrl_c_handler(int ignored);
 void hash_cracker(uint32_t orig_crc, uint8_t conflict[5]);
-void log_message(char *filename, char* msg);
+void *get_in_addr(struct sockaddr *sa);
 
 void *hashi_cracker(void *ptr);
 
 typedef struct thread_job_s {
-  char data[1024];
-  int len;
-  int socket_fd;
+    char data[1024];
+    int len;
+    int socket_fd;
 } thread_job_t;
 
 
 volatile sig_atomic_t quit = 0;
-
+int parentid = 0;
 
 /** @brief server main function
  *
@@ -55,26 +51,28 @@ int main (int argc, char **argv)
     pid_t childpid;
     socklen_t clilen;
     char buf[MAXLINE];
-    struct sockaddr_in cliaddr, servaddr;
+    struct sockaddr_in6 cliaddr, servaddr;
     char logbuf[MAXLINE];
-
-  pthread_t thread;
-  thread_job_t thread_data;
+    int reuseaddr = 1;
+    pthread_t worker_thread[2];
+    thread_job_t worker_data;
 
 // catch cntrl_c signal
     signal(SIGINT, cntrl_c_handler);
 
 //Create a socket for the soclet
 //If listenfd<0 there was an error in the creation of the socket
-    if ((listenfd = socket (AF_INET, SOCK_STREAM, 0)) <0) {
+    if ((listenfd = socket (AF_INET6, SOCK_STREAM, 0)) <0) {
         perror("Problem in creating the socket");
         exit(EXIT_FAILURE);
     }
 
+    setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &reuseaddr, sizeof(reuseaddr));
+
 //preparation of the socket address
-    servaddr.sin_family = AF_UNSPEC;
-    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    servaddr.sin_port = htons(port_number);
+    servaddr.sin6_family = AF_INET6;
+    servaddr.sin6_addr = in6addr_any;
+    servaddr.sin6_port = htons(port_number);
 
 //bind the socket
     bind (listenfd, (struct sockaddr *) &servaddr, sizeof(servaddr));
@@ -87,89 +85,82 @@ int main (int argc, char **argv)
 
     printf("%s\n","Server running...waiting for connections.");
     log_message("./log/serverlog","Server started - waiting for connections\n");
-    for( ; ; ) {
+    while(1) {
         clilen = sizeof(cliaddr);
         //accept a connection
         connfd = accept (listenfd, (struct sockaddr *) &cliaddr, &clilen);
         if(connfd == -1) {
             perror("Connecion not acceped");
-        } else {
-            printf("%s\n","Received request...");
-            log_message("./log/serverlog","Received request...\n");
+            exit(0);
         }
-        connections++;
-        if(connections > LISTENQ) {
-///TODO: send error to client and block connection
-            //  printf ("%s\n","connection blocked - reached maximum number of connections");
-            //  connections--;
-        } else {
-            childpid = fork ();
-            if (childpid < 0) {
-                perror("fork()");
-            } else if (childpid == 0) { //if it’s 0, it’s child process
-                printf ("%s\n","Child created for dealing with client requests");
-                log_message("./log/serverlog","Child created for dealing with client requests\n");
-pthread_create(&thread, NULL, hashi_cracker, (void *)&thread_data);
-                uint32_t crc = 0;
-                uint8_t new_hash[5];
-                while ((n = recv(connfd, buf, MAXLINE-1,0)) > 0)
-                {
-                    buf[n-1] = '\0';
-                    sprintf(logbuf,"String received from client: %s\n", buf);
+        printf("%s\n","Received request...");
+        log_message("./log/serverlog","Received request...\n");
+
+        childpid = fork ();
+        if (childpid < 0) {
+            perror("fork()");
+	    exit(0);
+        } else if (childpid == 0) { //if it’s 0, it’s child process
+//close (listenfd);
+            printf ("%s\n","Child created for dealing with client requests");
+            log_message("./log/serverlog","Child created for dealing with client requests\n");
+            uint32_t crc = 0;
+            uint8_t new_hash[5];
+            while (((n = recv(connfd, buf, MAXLINE-1,0)) > 0) && (quit == 0)) {
+                printf("QUIT = %d",quit);
+                buf[n-1] = '\0';
+                sprintf(logbuf,"String received from client: %s\n", buf);
+                log_message("./log/serverlog",logbuf);
+                printf("%s", logbuf);
+                if(strncmp(buf,"~logout~",8) == 0) {
+                    sprintf(buf,"~do-logout~\n");
+                    send(connfd, buf, strlen(buf), 0);
+                    sprintf(logbuf,"Client logged out, Child proccess will terminate -> PID: %d\n",getpid());
                     log_message("./log/serverlog",logbuf);
-                    printf("%s", logbuf);
-                    if(strncmp(buf,"~logout~",8) == 0) {
-                        sprintf(buf,"~do-logout~\n");
-                        send(connfd, buf, strlen(buf), 0);
-                        sprintf(logbuf,"Client logged out, Child proccess will terminate -> PID: %d\n",getpid());
-                        log_message("./log/serverlog",logbuf);
-                        printf("%s",logbuf);
-                        close(connfd);
-                        close (listenfd);
-                        connections--;
-                        exit(0);
-                    } else if((strncmp(buf,"~shutdown~",10) == 0) ||(quit ==1) ) {
-                        printf("ATTENTION: shutdown forced\n");
-                        sprintf(buf,"~do-logout~\n");
-                        send(connfd, buf, strlen(buf), 0);
-                        close(connfd);
-                        sprintf(logbuf,"Server will shutdown. Clients will be forced to terminate.\n");
-                        log_message("./log/serverlog",logbuf);
-                        printf("%s",logbuf);
-                        exit(0);
-                    } else {
-                        crc = crc32(buf, strlen(buf));
-
-                        new_hash[0] = 'T';
-                        new_hash[1] = 'E';
-                        new_hash[2] = 'S';
-                        new_hash[3] = 'T';
-                        new_hash[4] = '\0';
-
-                        hash_cracker(crc, new_hash);
-                        sprintf(logbuf,"conflict hash  of '%s' is '%s'\n",buf, new_hash);
-                        log_message("./log/serverlog",logbuf);
-                        printf("%s",logbuf);
-                        sprintf(buf,"conflict hash = '%s'\n",new_hash);
-                        send(connfd, buf, strlen(buf), 0);
-                    }
+                    printf("%s",logbuf);
+                    close (listenfd);
+                    exit(0);
+                } else {
+                    crc = crc32(buf, strlen(buf));
+                    new_hash[0] = 'T';
+                    new_hash[1] = 'E';
+                    new_hash[2] = 'S';
+                    new_hash[3] = 'T';
+                    new_hash[4] = '\0';
+                    // hash_cracker(crc, new_hash);
+                    sprintf(logbuf,"conflict hash  of '%s' is '%s'\n",buf, new_hash);
+                    log_message("./log/serverlog",logbuf);
+                    printf("%s",logbuf);
+                    sprintf(buf,"conflict hash = '%s'\n",new_hash);
+                    send(connfd, buf, strlen(buf), 0);
                 }
-            } else {  //parent
-                //close socket of the server
-                close(connfd);
             }
+            sprintf(buf,"~do-logout~\n");
+            send(connfd, buf, strlen(buf), 0);
+            close(connfd);
+            sprintf(logbuf,"Client forced to log out, Child proccess will terminate -> PID: %d\n",getpid());
+            log_message("./log/serverlog",logbuf);
+            printf("%s",logbuf);
+            exit(0);
+        } else {  //parent
+            //close socket of the server
+            printf("\nIN PARENT!!! %d\n", getpid());
+            close(connfd);
         }
     }
 }
+
+
 
 /** @brief catches control + c signal
  *
  */
 void cntrl_c_handler(int ignored) {
+    printf("ATTENTION: shutdown forced\nServer will shutdown. Clients will be forced to terminate when they send their next message.\n");
 
-    printf("\nexit with strg c \n");
     quit = 1;
-    exit(0);
+//	exit(0);
+
 }
 
 
@@ -204,36 +195,36 @@ void hash_cracker(uint32_t orig_crc,  uint8_t conflict[5])
 
 void *hashi_cracker(void *ptr)
 {
-/*
-  thread_job_t *job = (thread_job_t *)ptr;
-  uint32_t orig_crc = crc32(job->data, job->len);
-  char result[1024];
-  uint32_t cur_crc;
-  uint32_t i = 0;
+    /*
+      thread_job_t *job = (thread_job_t *)ptr;
+      uint32_t orig_crc = crc32(job->data, job->len);
+      char result[1024];
+      uint32_t cur_crc;
+      uint32_t i = 0;
 
-  // search for equal hash code 
- while (1) {
-    uint8_t in[] = {(i>>24), (i>>16), (i>>8), i};
-    cur_crc = crc32(in, sizeof(in));
+      // search for equal hash code
+     while (1) {
+        uint8_t in[] = {(i>>24), (i>>16), (i>>8), i};
+        cur_crc = crc32(in, sizeof(in));
 
-    if (cur_crc == orig_crc) {
-      break;
-    }
-    i++;
-  }
+        if (cur_crc == orig_crc) {
+          break;
+        }
+        i++;
+      }
 
-  // format result in string 
-  sprintf(result, "0x%08"PRIx32"\r\n", i);
+      // format result in string
+      sprintf(result, "0x%08"PRIx32"\r\n", i);
 
-  // send result to client 
-  if(send(job->socket_fd, result, strlen(result),
-          0) != strlen(result) ) {
-    perror("send");
-  }
+      // send result to client
+      if(send(job->socket_fd, result, strlen(result),
+              0) != strlen(result) ) {
+        perror("send");
+      }
 
-  */
+      */
 
 
-printf("IM AN A THREAD!!!\n");
-return NULL;
+    printf("IM AN A THREAD!!!\n");
+    return NULL;
 }
