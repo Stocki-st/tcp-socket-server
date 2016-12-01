@@ -30,6 +30,10 @@ void cntrl_c_handler(int ignored);
 void hash_cracker(uint32_t orig_crc, uint8_t conflict[5]);
 void *get_in_addr(struct sockaddr *sa);
 
+
+void SIGCHLD_handler(int) ;
+void install_SIGCHLD_handler(void) ;
+
 void *hashi_cracker(void *ptr);
 
 typedef struct thread_job_s {
@@ -59,6 +63,7 @@ int main (int argc, char **argv)
 
 // catch cntrl_c signal
     signal(SIGINT, cntrl_c_handler);
+    install_SIGCHLD_handler() ;
 
 //Create a socket for the soclet
 //If listenfd<0 there was an error in the creation of the socket
@@ -99,9 +104,10 @@ int main (int argc, char **argv)
         childpid = fork ();
         if (childpid < 0) {
             perror("fork()");
-	    exit(0);
+            exit(0);
         } else if (childpid == 0) { //if it’s 0, it’s child process
-//close (listenfd);
+            close(listenfd) ; // close listen port
+
             printf ("%s\n","Child created for dealing with client requests");
             log_message("./log/serverlog","Child created for dealing with client requests\n");
             uint32_t crc = 0;
@@ -227,4 +233,29 @@ void *hashi_cracker(void *ptr)
 
     printf("IM AN A THREAD!!!\n");
     return NULL;
+}
+
+// SIGCHLD handler, derived from W. Richard Stevens,
+// Network Programming, Vol.1, 2nd Edition, p128
+void SIGCHLD_handler(int signo)
+{
+    pid_t  pid ;
+    int  stat ;
+
+    while ( (pid=waitpid(-1,&stat,WNOHANG)) > 0 )
+        ;
+    // optional actions, usually nothing ;
+    return ;
+}
+
+// installer for the SIGCHLD handler
+void install_SIGCHLD_handler(void)
+{
+    struct sigaction act ;
+// block all signals during exec of SIGCHLD_handler
+    sigfillset(&act.sa_mask) ;
+    act.sa_handler = &SIGCHLD_handler ;
+// auto restart interrupted system calls
+    act.sa_flags = SA_RESTART ;
+    sigaction (SIGCHLD,&act,NULL) ;
 }
