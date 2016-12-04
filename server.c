@@ -143,7 +143,7 @@ int main (int argc, char **argv)
             printf("%s",logbuf);
             exit(0);
         } else {  //parent
-            printf("\nIN PARENT!!! %d\n", getpid());
+//           printf("\nIN PARENT!!! %d\n", getpid());
             close(connfd);
             if(quit ==1)
                 exit(EXIT_SUCCESS);
@@ -159,9 +159,9 @@ int main (int argc, char **argv)
  */
 void cntrl_c_handler(int ignored) {
     printf("ATTENTION: shutdown forced\nServer will shutdown. Clients will be forced to terminate when they send their next message.\n");
-
+log_message(serverlogfile,"server will shut down now\n");
     quit = 1;
-    printf("CNTRL-Handler -> PID: %d\n", getpid());
+//    printf("CNTRL-Handler -> PID: %d\n", getpid());
     exit(0);
 }
 
