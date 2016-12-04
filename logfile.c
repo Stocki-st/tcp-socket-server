@@ -1,5 +1,5 @@
 /*
- * @filename:    timestamp.c
+ * @filename:    logfile.c
  * @author:      Stefan Stockinger
  * @date:        2016-11-16
  * @description: this file contains the logfile function

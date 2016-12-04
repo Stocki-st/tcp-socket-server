@@ -22,6 +22,7 @@
 #include "crc32.h"
 
 #define _GNU_SOURCE
+#define _POSIX_C_SOURCE     200809L
 
 #define MAXFILENAME 25 //maximum length of filename
 
