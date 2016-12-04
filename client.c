@@ -31,6 +31,7 @@ int hostname_to_ip(char *hostname , char *ip);
 
 volatile sig_atomic_t quit = 0;
 
+enum {DEFAULT=0, IPv4, IPv6} eIPversion;
 
 /** @brief client main function
  *
@@ -40,6 +41,8 @@ int main(int argc, char **argv)
     int sockfd, n, inputfile = 0;
     extern char *optarg;
     struct sockaddr_in servaddr;
+    struct sockaddr_in6 servaddr6;
+    int ipflag = DEFAULT;
     char sendline[MAXLINE], recvline[MAXLINE];
     char filename[MAXFILENAME];
     char logname[MAXFILENAME];
@@ -47,11 +50,9 @@ int main(int argc, char **argv)
     char c;
     uint32_t crc;
 
-// catch cntrl_c signal
-    signal(SIGINT, cntrl_c_handler);
-
 //Creation of the socket
     memset(&servaddr, 0, sizeof(servaddr));
+    memset(&servaddr6, 0, sizeof(servaddr6));
 
 //open/create logfile
     sprintf(logname, "./log/clientlog_%d\n",getpid());
@@ -62,13 +63,11 @@ int main(int argc, char **argv)
         switch(c) {
         case 'i':
             if(inet_pton(AF_INET, optarg, &servaddr.sin_addr)) {
-                //IPv4
-                ip_address = strdup(optarg);
-            } else if(inet_pton(AF_INET6 , optarg, &servaddr.sin_addr)) {
-                //IPv6
+                ipflag = IPv4;
+            } else if(inet_pton(AF_INET6 , optarg, &servaddr6.sin6_addr)) {
+                ipflag = IPv6;
                 servaddr.sin_family = AF_INET6;
             } else {
-                //hostname
                 if(hostname_to_ip(strdup(optarg), ip_address)) {
                     sprintf(logmsg,"unable to resolve hostname - please check your input!");
                     perror(logmsg);
@@ -76,11 +75,7 @@ int main(int argc, char **argv)
                     exit(EXIT_FAILURE);
                 }
             }
-            sprintf(logmsg,"resolve '%s' to ip: '%s'", strdup(optarg), ip_address);
-            perror(logmsg);
-            log_message(logname, logmsg);
             break;
-
         case 'p':
             port_number = atoi(optarg);
             break;
@@ -101,31 +96,71 @@ int main(int argc, char **argv)
         }
     }
 
+//try to establish connection to desired ip/port using the choosen ip type
+    switch(ipflag) {
+    case DEFAULT:
+        servaddr.sin_addr.s_addr= inet_addr(ip_address);
+    case IPv4:
+        servaddr.sin_family = AF_INET;
+        servaddr.sin_port =  htons(port_number);
+//convert to big-endian order
 //Create a socket for the client
 //If sockfd<0 there was an error in the creation of the socket
-    if ((sockfd = socket (AF_INET, SOCK_STREAM, 0)) <0) {
-        sprintf(logmsg, "Problem in creating the socket\n");
-        perror(logmsg);
-        log_message(logname,logmsg);
-        exit(EXIT_FAILURE);
-    }
-//Creation of the socket
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_addr.s_addr= inet_addr(ip_address);
-    servaddr.sin_port =  htons(port_number); //convert to big-endian order
+        if ((sockfd = socket (AF_INET, SOCK_STREAM, 0)) <0) {
+            sprintf(logmsg, "Problem in creating the socket\n");
+            perror(logmsg);
+            log_message(logname,logmsg);
+            exit(EXIT_FAILURE);
+        }
+        printf("IPv4 socket created... Try to connect to server...\n");
 
 //Connection of the client to the socket
-    if (connect(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr))<0) {
-        sprintf(logmsg, "Unable to connect. Please check IP and Port settings.");
+        if (connect(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr))<0) {
+            sprintf(logmsg, "Unable to connect. Please check IP and Port settings.\nExit ");
+            perror(logmsg);
+            log_message(logname,logmsg);
+            exit(EXIT_FAILURE);
+        }
+        sprintf(logmsg,"Succesfully connected to %s on port %d\n", ip_address, port_number);
+        printf("%s", logmsg);
+        log_message(logname, logmsg);
+        break;
+    case IPv6:
+        servaddr6.sin6_family = AF_INET6;
+        servaddr6.sin6_port =  htons(port_number);
+//convert to big-endian order
+//Create a socket for the client
+//If sockfd<0 there was an error in the creation of the socket
+        if ((sockfd = socket (AF_INET6, SOCK_STREAM, 0)) <0) {
+            sprintf(logmsg, "Problem in creating the socket\n");
+            perror(logmsg);
+            log_message(logname,logmsg);
+            exit(EXIT_FAILURE);
+        }
+        printf("IPv6 socket created... Try to connect to server...\n");
+
+//Connection of the client to the socket
+        if (connect(sockfd, (struct sockaddr *) &servaddr6, sizeof(servaddr6))<0) {
+            sprintf(logmsg, "Unable to connect. Please check IP and Port settings.\nExit ");
+            perror(logmsg);
+            log_message(logname,logmsg);
+            exit(EXIT_FAILURE);
+        }
+        sprintf(logmsg,"Succesfully connected to server\n");
+        printf("%s", logmsg);
+        log_message(logname, logmsg);
+        break;
+    default:
+        sprintf(logmsg, "Unable to connect. Please check IP and Port settings.\nExit ");
         perror(logmsg);
         log_message(logname,logmsg);
         exit(EXIT_FAILURE);
     }
-    sprintf(logmsg,"Succesfully connected to %s on port %d\n", ip_address, port_number);
-    printf("%s", logmsg);
-    log_message(logname, logmsg);
 
-    //redirect file stdinput to file
+//catch strg+c command as soon as connection is established
+    signal(SIGINT, cntrl_c_handler);
+
+    //redirect file stdinput to file if there was a file choosen
     if(inputfile>0)
         dup2(inputfile, STDIN_FILENO);
 
@@ -142,7 +177,7 @@ int main(int argc, char **argv)
             quit = 0;
         } else {
             //check for special commands (must not be hashed)
-            if(!((strncmp(sendline,"~logout~",8) == 0) || (strncmp(sendline,"~shutdown~",10) == 0))) {
+            if(!(strncmp(sendline,"~logout~",8) == 0) ) {
                 crc = crc32(sendline, strlen(sendline));
                 sendline[strlen(sendline)-1] = '\0';
                 sprintf(logmsg,"Hash of '%s' is '%u'\n", sendline, crc);
@@ -180,10 +215,9 @@ int main(int argc, char **argv)
 
 
 
-
-
 /** @brief catches the control + c signal
  *
+ *  @param ignored   number of ignored signal
  */
 void cntrl_c_handler(int ignored)
 {
@@ -195,6 +229,11 @@ void cntrl_c_handler(int ignored)
 
 /** @brief get ip from domain name
  *   source: https://cis.technikum-wien.at/documents/mes/1/sec/semesterplan/em2/vo-03-sockets.handout.pdf
+*
+ * @param	hostname	pointer to the hostname
+ * 			ip          pointer to the ip adress
+ *
+ * @return 	0 on success, -1 if there was a problem
  */
 int hostname_to_ip(char *hostname , char *ip)
 {
@@ -227,7 +266,7 @@ int hostname_to_ip(char *hostname , char *ip)
  */
 void print_help(void)
 {
-    const char helpmsg[] = {"~HELP~\nTo use this client you have to add the IP and the Port as parameter.\nFor example:\n\n ./client -i 127.0.0.1 -p 7777 -f ./Client_read/read1\n\nThe Client will connect to IP 127.0.0.1 on port 7777 and uses the file 'read1' in the folder 'Client_read' as source.\n\nAll options:\n# -i ... IP address\n# -p ... Port \n# -h ... Help\n# -f ... read from file\n\nIf you do not set any IP or port, default values (ipconf.h) will be used.\nSpecial command:\n ~logout~ ... client will disconnect and terminate.\n ~shutdown~ ... server will shutdown\n\nExit"};
+    const char helpmsg[] = {"~HELP~\nTo use this client you have to add the IP and the Port as parameter.\nFor example:\n\n ./client -i 127.0.0.1 -p 7777 -f ./Client_read/read1\n\nThe Client will connect to IP 127.0.0.1 on port 7777 and uses the file 'read1' in the folder 'Client_read' as source.\n\nAll options:\n# -i ... IP address\n# -p ... Port \n# -h ... Help\n# -f ... read from file\n\nIf you do not set any IP or port, default values (ipconf.h) will be used.\nSpecial command:\n ~logout~ ... client will disconnect and terminate.\n\nExit"};
     printf("%s\n", helpmsg);
 }
 

@@ -11,14 +11,11 @@ astyle ./*.c ./*.h
 
 To do:
 
-3) Server Shutdown on Server (<- server should send do-logout command to all connected clients)
+
 11) server daemonization
-15) check #define _POSIX_C_SOURCE     200112L warning
-16) IPv6 support
 20) provide meaningful exit codes
-26)
-27)
-28)
+27) worker threads
+28) shutdown when all children are logged out (force parent to leave listen and shutdown)
 29)
 39)
 31)
@@ -26,6 +23,14 @@ To do:
 33)
 
 Changelog:
+
+04.12.2016
+26) IPv6 support on client
+
+01.01.2016
+16) IPv6 support on server
+15) check #define _POSIX_C_SOURCE     200112L warning
+3) Server Shutdown on Server (<- server should send do-logout command to all connected clients)
 
 30.11.2016
 25) created log thread for server
@@ -62,8 +67,8 @@ Changelog:
 extras:
 
 Daemonization of the server (optional, +3 points)
-Proper shutdown (optional, +3 points)
 Returning ASCII strings only (optional, +3 points)
-Reading input from a file (optional, +3 points)
-Support for IPv6 and hostnames (optional, +5 points)
+Proper shutdown (optional, +3 points) (shutdown of parent missing)
+Support for IPv6 and hostnames (optional, +5 points) (IPv6 on client missing)
+Reading input from a file (optional, +3 points) (ok)
 

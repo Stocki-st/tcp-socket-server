@@ -25,7 +25,6 @@
 #include "crc32.h"
 #include "logfile.h"
 
-
 void cntrl_c_handler(int ignored);
 void hash_cracker(uint32_t orig_crc, uint8_t conflict[5]);
 void *get_in_addr(struct sockaddr *sa);
@@ -72,7 +71,10 @@ int main (int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &reuseaddr, sizeof(reuseaddr));
+    // setsockopt() free previously used sockets()
+    if (setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &reuseaddr, sizeof(reuseaddr)) == -1)
+        perror("setsockopt error");
+
 
 //preparation of the socket address
     servaddr.sin6_family = AF_INET6;
@@ -91,17 +93,19 @@ int main (int argc, char **argv)
     printf("%s\n","Server running...waiting for connections.");
     log_message("./log/serverlog","Server started - waiting for connections\n");
     while(1) {
-        clilen = sizeof(cliaddr);
-        //accept a connection
-        connfd = accept (listenfd, (struct sockaddr *) &cliaddr, &clilen);
-        if(connfd == -1) {
-            perror("Connecion not acceped");
-            exit(0);
-        }
-        printf("%s\n","Received request...");
-        log_message("./log/serverlog","Received request...\n");
+        if(quit==0) {
+            clilen = sizeof(cliaddr);
+            //accept a connection
+            connfd = accept (listenfd, (struct sockaddr *) &cliaddr, &clilen);
+            if(connfd == -1) {
+                perror("Connecion not acceped");
+                exit(0);
+            }
+            printf("%s\n","Received request...");
+            log_message("./log/serverlog","Received request...\n");
 
-        childpid = fork ();
+            childpid = fork ();
+        }
         if (childpid < 0) {
             perror("fork()");
             exit(0);
@@ -152,8 +156,11 @@ int main (int argc, char **argv)
             //close socket of the server
             printf("\nIN PARENT!!! %d\n", getpid());
             close(connfd);
+            if(quit ==1)
+                exit(EXIT_SUCCESS);
         }
     }
+    exit(0);
 }
 
 
@@ -165,8 +172,8 @@ void cntrl_c_handler(int ignored) {
     printf("ATTENTION: shutdown forced\nServer will shutdown. Clients will be forced to terminate when they send their next message.\n");
 
     quit = 1;
+    printf("CNTRL-Handler -> PID: %d\n", getpid());
 //	exit(0);
-
 }
 
 
