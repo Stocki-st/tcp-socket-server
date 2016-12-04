@@ -63,16 +63,32 @@ int main(int argc, char **argv)
         switch(c) {
         case 'i':
             if(inet_pton(AF_INET, optarg, &servaddr.sin_addr)) {
+                servaddr.sin_addr.s_addr= inet_addr(strdup(optarg));
                 ipflag = IPv4;
+                break;
             } else if(inet_pton(AF_INET6 , optarg, &servaddr6.sin6_addr)) {
                 ipflag = IPv6;
                 servaddr.sin_family = AF_INET6;
+                break;
             } else {
-                if(hostname_to_ip(strdup(optarg), ip_address)) {
+                switch(hostname_to_ip(strdup(optarg), ip_address)) {
+                case -1: {
                     sprintf(logmsg,"unable to resolve hostname - please check your input!");
                     perror(logmsg);
                     log_message(logname, logmsg);
                     exit(EXIT_FAILURE);
+                }
+                case IPv4:
+                    servaddr.sin_addr.s_addr= inet_addr(ip_address);
+                    if(inet_pton(AF_INET, optarg, &servaddr.sin_addr)) {
+                        ipflag = IPv4;
+                    }
+                    break;
+                case IPv6:
+                    if(inet_pton(AF_INET6 , optarg, &servaddr6.sin6_addr)) {
+                        ipflag = IPv6;
+                    }
+                    break;
                 }
             }
             break;
@@ -99,7 +115,7 @@ int main(int argc, char **argv)
 //try to establish connection to desired ip/port using the choosen ip type
     switch(ipflag) {
     case DEFAULT:
-        servaddr.sin_addr.s_addr= inet_addr(ip_address);
+        servaddr.sin_addr.s_addr= inet_addr("127.0.0.1");
     case IPv4:
         servaddr.sin_family = AF_INET;
         servaddr.sin_port =  htons(port_number);
@@ -233,30 +249,32 @@ void cntrl_c_handler(int ignored)
  * @param	hostname	pointer to the hostname
  * 			ip          pointer to the ip adress
  *
- * @return 	0 on success, -1 if there was a problem
+ * @return 	the IP - type on success, -1 if there was a problem
  */
 int hostname_to_ip(char *hostname , char *ip)
 {
     struct addrinfo * servinfo ;
-    int ret = getaddrinfo (hostname, NULL , NULL , &servinfo );
-    if ( ret != 0) {
-        return -1;
+    int ret = -1;
+
+    if ( getaddrinfo (hostname, NULL , NULL , &servinfo ) != 0) {
+        return ret;
     }
 
 // loop through all the results and connect to the first we can
     struct addrinfo *p;
-    //char ipstr [8*4 + 7 + 1];
     for (p = servinfo; p != NULL; p = p->ai_next) {
         if (p->ai_family == AF_INET) {
             struct sockaddr_in *s = (struct sockaddr_in *)p->ai_addr;
             inet_ntop(AF_INET, &s->sin_addr, ip, sizeof(ip));
+            ret = IPv4;
         } else { // AF_INET6
             struct sockaddr_in6 *s = (struct sockaddr_in6 *)p->ai_addr ;
             inet_ntop(AF_INET6, &s->sin6_addr, ip, sizeof(ip));
+            ret = IPv6;
         }
     }
     freeaddrinfo(servinfo);
-    return 0;
+    return ret;
 }
 
 

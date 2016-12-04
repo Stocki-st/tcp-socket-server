@@ -15,6 +15,5 @@ If you do not set any IP or port, default values (ipconf.h) will be used.
 
 Special commands:
  ~logout~ ... client will disconnect and terminate.
- ~shutdown~ ... server will shutdown
 
 

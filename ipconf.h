@@ -11,7 +11,8 @@
 
 #define MAXLINE 1024 //max text line length
 #define LISTENQ 20
-char* ip_address = "127.0.0.1";
+
+char ip_address [8*4 + 7 + 1];
 uint16_t port_number = 7777;
 
 #endif

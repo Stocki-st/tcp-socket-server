@@ -165,8 +165,9 @@ int main (int argc, char **argv)
 
 
 
-/** @brief catches control + c signal
+/** @brief catches the control + c signal
  *
+ *  @param ignored   number of ignored signal
  */
 void cntrl_c_handler(int ignored) {
     printf("ATTENTION: shutdown forced\nServer will shutdown. Clients will be forced to terminate when they send their next message.\n");
@@ -242,8 +243,11 @@ void *hashi_cracker(void *ptr)
     return NULL;
 }
 
-// SIGCHLD handler, derived from W. Richard Stevens,
-// Network Programming, Vol.1, 2nd Edition, p128
+/** @brief SIGCHLD_handler to avoid zombies, derived from W. Richard Stevens,
+ * 		 Network Programming, Vol.1, 2nd Edition, p128
+ *
+ *  @param signo   number of ignored signal
+ */
 void SIGCHLD_handler(int signo)
 {
     pid_t  pid ;
@@ -255,7 +259,9 @@ void SIGCHLD_handler(int signo)
     return ;
 }
 
-// installer for the SIGCHLD handler
+
+/** @brief installer for the SIGCHLD handler
+ */
 void install_SIGCHLD_handler(void)
 {
     struct sigaction act ;
