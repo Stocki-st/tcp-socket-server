@@ -1,5 +1,17 @@
 README
 
+how to build:
+
+make clean
+make server
+make client
+
+how to start:
+
+./server
+./client
+
+
 ~HELP~
 To use this client you have to add the IP and the Port as parameter.
 For example:
@@ -15,5 +27,12 @@ If you do not set any IP or port, default values (ipconf.h) will be used.
 
 Special commands:
  ~logout~ ... client will disconnect and terminate.
+
+
+
+implemented features:
+client logout: ~logout~
+ipv4,ipv6 and hostname support
+file read in
 
 
