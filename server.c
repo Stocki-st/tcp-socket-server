@@ -25,9 +25,6 @@
 #include "crc32.h"
 #include "logfile.h"
 
-#define _GNU_SOURCE
-#define _POSIX_C_SOURCE     200809L
-
 void cntrl_c_handler(int ignored);
 void hash_cracker(uint32_t orig_crc, uint8_t conflict[5]);
 
@@ -100,7 +97,7 @@ int main (int argc, char **argv)
         if (childpid < 0) {
             perror("fork()");
             exit(0);
-        } else if (childpid == 0) { //if itâ€™s 0, itâ€™s child process
+        } else if (childpid == 0) { //if it’s 0, it’s child process
             close(listenfd) ; // close listen port
 
             printf ("%s\n","Child created for dealing with client requests");
